@@ -1,18 +1,15 @@
 #include <Arduino.h>
-
+#include <DESIoT_Gateway.h>
 // put function declarations here:
-int myFunction(int, int);
 
 void setup() {
   // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+  DESIoT_G_begin();
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
+  DESIoT_G_loop();
 }
 
 // put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
-}
