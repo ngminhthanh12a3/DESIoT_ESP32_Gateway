@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include "DESIoT_Gateway.h"
 
+DESIoT_CBUF_t hUARTCBuffer = {.start = 0, .end = 0};
+
 void DESIoT_G_begin()
 {
 #ifdef ESP32
@@ -31,6 +33,11 @@ void DESIoT_G_begin()
 
 void DESIoT_G_loop()
 {
+    uint8_t rx;
+    if (DESIoT_CBUF_getByte(&hUARTCBuffer, &rx) == DESIOT_CBUF_OK)
+    {
+        Serial.printf("\r\n%02X", rx);
+    }
 }
 
 /*
@@ -45,9 +52,27 @@ static void IRAM_ATTR DESIoT_UART_INTR_HANDLE(void *arg)
     while (rx_fifo_len)
     {
         uint8_t uart_byte = UART2.fifo.rw_byte; // read all bytes
-
+        DESIoT_CBUF_putByte(&hUARTCBuffer, uart_byte);
         rx_fifo_len--;
     }
     // after reading bytes from buffer clear UART interrupt status
     uart_clear_intr_status(DESIOT_UART_NUM, UART_RXFIFO_FULL_INT_CLR | UART_RXFIFO_TOUT_INT_CLR);
+}
+
+uint8_t DESIoT_CBUF_getByte(DESIoT_CBUF_t *hCBuf, uint8_t *rx)
+{
+    if (hCBuf->end != hCBuf->start)
+    {
+        *rx = hCBuf->buffer[hCBuf->start++];
+        hCBuf->start %= DESIOT_CIR_BUF_SIZE;
+        return DESIOT_CBUF_OK;
+    }
+
+    return DESIOT_CBUF_ERROR;
+}
+
+void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx)
+{
+    hCBuf->buffer[hCBuf->end++] = rx;
+    hCBuf->end %= DESIOT_CIR_BUF_SIZE;
 }
