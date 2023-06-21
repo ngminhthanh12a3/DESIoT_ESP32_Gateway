@@ -33,6 +33,7 @@
 
 void DESIoT_G_begin();
 void DESIoT_G_loop();
+void DESIoT_G_frameArbitrating();
 
 // Circular buffer
 typedef struct
@@ -68,7 +69,8 @@ typedef struct
     DESIoT_dataPacket_t dataPacket;
     uint8_t t1;
     uint8_t t2;
-    union{
+    union
+    {
         uint16_t crc;
         uint8_t crcArr[2];
     };
@@ -77,8 +79,19 @@ typedef struct
 typedef struct
 {
     uint8_t index;
+    uint8_t status;
     DESIoT_Frame_t frame;
 } DESIoT_Frame_Hander_t;
+
+#define DESIOT_SET_FRAME_FAILED_STATUS(status) status--
+#define DESIOT_SET_FRAME_SUCCESS_STATUS(status) status -= 2
+enum DESIOT_FRAME_STATUSES
+{
+    DESIOT_FRAME_IDLE,
+    DESIOT_FRAME_UART0_SUCCESS,
+    DESIOT_FRAME_UART0_FAILED,
+    DESIOT_FRAME_IN_UART0_PROGRESS
+};
 
 enum DESIOT_HEAD_FRAME_INDEXES
 {
@@ -100,7 +113,8 @@ void DESIoT_CalculateTable_CRC16();
 uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
 
 void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte);
-
+void DESIoT_frameFailedHandler();
+void DESIoT_frameSuccessHandler();
 #ifdef ESP32
 static intr_handle_t handle_console;
 static void IRAM_ATTR DESIoT_UART_INTR_HANDLE(void *arg);

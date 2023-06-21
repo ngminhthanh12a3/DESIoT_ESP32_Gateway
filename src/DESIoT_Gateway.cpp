@@ -33,11 +33,9 @@ void DESIoT_G_begin()
 
 void DESIoT_G_loop()
 {
-    uint8_t rx;
-    if (DESIoT_CBUF_getByte(&hUARTCBuffer, &rx) == DESIOT_CBUF_OK)
-    {
-        DESIoT_FRAME_parsing(&hFrame, rx);
-    }
+    DESIoT_frameFailedHandler();
+    DESIoT_frameSuccessHandler();
+    DESIoT_G_frameArbitrating();
 }
 
 /*
@@ -83,15 +81,16 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
     {
     case DESIOT_H1_INDEX:
         if (byte == DESIOT_H1_DEFAULT)
-        {
             hFrame->frame.h1 = byte;
-        }
+
+        else
+            DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
         break;
     case DESIOT_H2_INDEX:
         if (byte == DESIOT_H2_DEFAULT)
-        {
             hFrame->frame.h2 = byte;
-        }
+        else
+            DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
         break;
     case DESIOT_CMD_INDEX:
         hFrame->frame.dataPacket.cmd = byte;
@@ -106,16 +105,16 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
         if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen)) // t1
         {
             if (byte == DESIOT_T1_DEFAULT)
-            {
                 hFrame->frame.t1 = byte;
-            }
+            else
+                DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
         }
         else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 1)) // t2
         {
             if (byte == DESIOT_T2_DEFAULT)
-            {
                 hFrame->frame.t2 = byte;
-            }
+            else
+                DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
         }
         else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 2)) // crc1
         {
@@ -126,7 +125,9 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
             hFrame->frame.crcArr[1] = byte;
             uint16_t crcCalculate = DESIoT_Compute_CRC16((uint8_t *)&hFrame->frame.dataPacket, DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + hFrame->frame.dataPacket.dataLen);
             if (crcCalculate == hFrame->frame.crc)
-                Serial.printf("\r\nFrame OK");
+                DESIOT_SET_FRAME_SUCCESS_STATUS(hFrame->status);
+            else
+                DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
         }
         else
         {
@@ -174,4 +175,44 @@ uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN)
     //	printf("\nHERE 3");
 
     return crc;
+}
+
+void DESIoT_G_frameArbitrating()
+{
+    // arbitrating for UART0
+    if (hFrame.status == DESIOT_FRAME_IDLE || hFrame.status == DESIOT_FRAME_IN_UART0_PROGRESS)
+    {
+        uint8_t rx;
+        if (DESIoT_CBUF_getByte(&hUARTCBuffer, &rx) == DESIOT_CBUF_OK)
+        {
+            hFrame.status = DESIOT_FRAME_IN_UART0_PROGRESS;
+            DESIoT_FRAME_parsing(&hFrame, rx);
+        }
+    }
+}
+
+void DESIoT_frameFailedHandler()
+{
+    switch (hFrame.status)
+    {
+    case DESIOT_FRAME_UART0_FAILED:
+        hFrame.status = DESIOT_FRAME_IDLE;
+        hFrame.index = 0;
+        Serial.printf("\r\nUART0 Failed");
+        break;
+    }
+}
+void DESIoT_frameSuccessHandler()
+{
+    switch (hFrame.status)
+    {
+    case DESIOT_FRAME_UART0_SUCCESS:
+        hFrame.status = DESIOT_FRAME_IDLE;
+        hFrame.index = 0;
+        Serial.printf("\r\nUART0 Success");
+        break;
+
+    default:
+        break;
+    }
 }
