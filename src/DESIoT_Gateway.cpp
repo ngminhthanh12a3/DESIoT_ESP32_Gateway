@@ -1,4 +1,11 @@
+#ifdef ESP32
 #include <Arduino.h>
+unsigned long DESIoT_millis()
+{
+    return millis();
+}
+#endif
+
 #include "DESIoT_Gateway.h"
 
 DESIoT_CBUF_t hUARTCBuffer = {.start = 0, .end = 0};
@@ -35,6 +42,7 @@ void DESIoT_G_loop()
 {
     DESIoT_frameFailedHandler();
     DESIoT_frameSuccessHandler();
+    DESIoT_frameTimeoutHandler();
     DESIoT_G_frameArbitrating();
 }
 
@@ -80,6 +88,7 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
     switch (hFrame->index)
     {
     case DESIOT_H1_INDEX:
+        hFrame->millis = DESIoT_millis();
         if (byte == DESIOT_H1_DEFAULT)
             hFrame->frame.h1 = byte;
 
@@ -127,7 +136,9 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
             if (crcCalculate == hFrame->frame.crc)
                 DESIOT_SET_FRAME_SUCCESS_STATUS(hFrame->status);
             else
+            {
                 DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+            }
         }
         else
         {
@@ -196,8 +207,7 @@ void DESIoT_frameFailedHandler()
     switch (hFrame.status)
     {
     case DESIOT_FRAME_UART0_FAILED:
-        hFrame.status = DESIOT_FRAME_IDLE;
-        hFrame.index = 0;
+        DESIoT_restartFrameIndexes();
         Serial.printf("\r\nUART0 Failed");
         break;
     }
@@ -207,12 +217,27 @@ void DESIoT_frameSuccessHandler()
     switch (hFrame.status)
     {
     case DESIOT_FRAME_UART0_SUCCESS:
-        hFrame.status = DESIOT_FRAME_IDLE;
-        hFrame.index = 0;
+        DESIoT_restartFrameIndexes();
         Serial.printf("\r\nUART0 Success");
         break;
 
     default:
         break;
     }
+}
+
+void DESIoT_restartFrameIndexes()
+{
+    hFrame.status = DESIOT_FRAME_IDLE;
+    hFrame.index = 0;
+}
+
+void DESIoT_frameTimeoutHandler()
+{
+    if (DESIOT_IS_FRAME_ON_PROCESS_STATUS(hFrame.status))
+        if (DESIoT_millis() - hFrame.millis > DESIOT_TIMEOUT_DURATION)
+        {
+            DESIoT_restartFrameIndexes();
+            Serial.printf("\r\nFrame timeout");
+        }
 }

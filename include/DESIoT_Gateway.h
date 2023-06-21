@@ -80,11 +80,14 @@ typedef struct
 {
     uint8_t index;
     uint8_t status;
+    uint64_t millis;
     DESIoT_Frame_t frame;
 } DESIoT_Frame_Hander_t;
 
 #define DESIOT_SET_FRAME_FAILED_STATUS(status) status--
 #define DESIOT_SET_FRAME_SUCCESS_STATUS(status) status -= 2
+#define DESIOT_IS_FRAME_ON_PROCESS_STATUS(status) ((status != DESIOT_FRAME_IDLE) && !(status % 3))
+#define DESIOT_TIMEOUT_DURATION 2000
 enum DESIOT_FRAME_STATUSES
 {
     DESIOT_FRAME_IDLE,
@@ -115,9 +118,12 @@ uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
 void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte);
 void DESIoT_frameFailedHandler();
 void DESIoT_frameSuccessHandler();
+void DESIoT_restartFrameIndexes();
+void DESIoT_frameTimeoutHandler();
 #ifdef ESP32
 static intr_handle_t handle_console;
 static void IRAM_ATTR DESIoT_UART_INTR_HANDLE(void *arg);
+unsigned long DESIoT_millis();
 #endif
 
 #endif /* INC_DESIOT_GATEWAY_H_ */
