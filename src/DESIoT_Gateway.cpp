@@ -33,6 +33,7 @@ void DESIoT_G_loop()
 {
 }
 
+extern CBufer_handleTypeDef_t hcBuffer;
 /*
  * Define UART interrupt subroutine to ackowledge interrupt
  */
@@ -45,9 +46,26 @@ static void IRAM_ATTR DESIoT_UART_INTR_HANDLE(void *arg)
     while (rx_fifo_len)
     {
         uint8_t uart_byte = UART2.fifo.rw_byte; // read all bytes
-
+        CBUFFER_putByte(&hcBuffer, uart_byte);
         rx_fifo_len--;
     }
     // after reading bytes from buffer clear UART interrupt status
     uart_clear_intr_status(DESIOT_UART_NUM, UART_RXFIFO_FULL_INT_CLR | UART_RXFIFO_TOUT_INT_CLR);
+}
+
+void CBUFFER_putByte(CBufer_handleTypeDef_t *hcBuffer, uint8_t byte)
+{
+    hcBuffer->buf[hcBuffer->end++] = byte;
+    hcBuffer->end %= DESIOT_CIR_BUF_SIZE;
+}
+
+uint8_t CBUFFER_getByte(CBufer_handleTypeDef_t *hcBuffer, uint8_t *rx)
+{
+    if (hcBuffer->end != hcBuffer->start)
+    {
+        *rx = hcBuffer->buf[hcBuffer->start++];
+        hcBuffer->start %= DESIOT_CIR_BUF_SIZE;
+        return CBUFFER_OK;
+    }
+    return CBUFFER_ERROR;
 }
