@@ -1,5 +1,7 @@
 #include "DESIoT_Gateway.h"
 
+#include "DESIoT_Gateway.h"
+
 #ifdef ESP32
 AsyncMqttClient mqttClient;
 TimerHandle_t mqttReconnectTimer;
@@ -16,6 +18,10 @@ DESIoT_Frame_Hander_t hFrame = {.index = 0};
 
 void DESIoT_UART_begin()
 {
+#if defined(DESIOT_WIFI_PASSWORD)
+    Serial.println("DESIOT_WIFI_PASSWORD");
+    Serial.println(DESIOT_WIFI_PASSWORD);
+#endif
 #if defined(DESIOT_WIFI_PASSWORD)
     Serial.println("DESIOT_WIFI_PASSWORD");
     Serial.println(DESIOT_WIFI_PASSWORD);
@@ -226,7 +232,8 @@ void DESIoT_frameSuccessHandler()
     {
     case DESIOT_FRAME_UART0_SUCCESS:
         DESIoT_restartFrameIndexes();
-        // Serial.printf("\r\nUART0 Success");
+        // // Serial.printf("\r\nUART0 Success");
+        DESIoT_sendFrameToServer();
         DESIoT_sendFrameToServer();
         break;
 
