@@ -1,11 +1,16 @@
-#include <Arduino.h>
-#include <DESIoT_Gateway.h>
+#define DESIOT_USER_WIFI_SSID "ThanhNguyen_test"
+#define DESIOT_USER_WIFI_PASSWORD "nguyent1220"
+
+// #include <Arduino.h>
+#include "DESIoT_Gateway.h"
+
 // put function declarations here:
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
   DESIoT_G_begin();
+  // DESIoT_getUserMacros();
 }
 
 void loop() {
