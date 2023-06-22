@@ -234,7 +234,6 @@ void DESIoT_frameSuccessHandler()
         DESIoT_restartFrameIndexes();
         // // Serial.printf("\r\nUART0 Success");
         DESIoT_sendFrameToServer();
-        DESIoT_sendFrameToServer();
         break;
 
     default:
@@ -260,11 +259,18 @@ void DESIoT_frameTimeoutHandler()
 
 void DESIoT_sendFrameToServer()
 {
-    const char *payload = (const char *)&hFrame.frame;
+    char *payload = (char *)&hFrame.frame;
     size_t length = DESIOT_FIXED_COMPOMENTS_LENGTH + hFrame.frame.dataPacket.dataLen;
+    
+    //shift trail frame
+    char *pTrailFrame = payload + DESIOT_HEAD_FRAME_LEN + hFrame.frame.dataPacket.dataLen;
+    memcpy(pTrailFrame, &hFrame.frame.t1, DESIOT_TRAIL_FRAME_LEN);
+
     uint16_t packetID = mqttClient.publish(DESIOT_MQTT_PUBLISH_TOPIC, 2, false, payload, length);
     if (!packetID)
         Serial.printf("\r\nPublish failed");
+    else
+        printf("\r\nPublish successfully with %d bytes of data", length);
 }
 
 void connectToMqtt()
