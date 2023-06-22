@@ -1,17 +1,25 @@
+#include "DESIoT_Gateway.h"
+
 #ifdef ESP32
-#include <Arduino.h>
+AsyncMqttClient mqttClient;
+TimerHandle_t mqttReconnectTimer;
+TimerHandle_t wifiReconnectTimer;
+
 unsigned long DESIoT_millis()
 {
     return millis();
 }
 #endif
 
-#include "DESIoT_Gateway.h"
-
 DESIoT_CBUF_t hUARTCBuffer = {.start = 0, .end = 0};
 DESIoT_Frame_Hander_t hFrame = {.index = 0};
-void DESIoT_G_begin()
+
+void DESIoT_UART_begin()
 {
+#if defined(DESIOT_WIFI_PASSWORD)
+    Serial.println("DESIOT_WIFI_PASSWORD");
+    Serial.println(DESIOT_WIFI_PASSWORD);
+#endif
 #ifdef ESP32
     // UART setup
     uart_config_t uart_config = {
@@ -218,7 +226,8 @@ void DESIoT_frameSuccessHandler()
     {
     case DESIOT_FRAME_UART0_SUCCESS:
         DESIoT_restartFrameIndexes();
-        Serial.printf("\r\nUART0 Success");
+        // Serial.printf("\r\nUART0 Success");
+        DESIoT_sendFrameToServer();
         break;
 
     default:
@@ -240,4 +249,111 @@ void DESIoT_frameTimeoutHandler()
             DESIoT_restartFrameIndexes();
             Serial.printf("\r\nFrame timeout");
         }
+}
+
+void DESIoT_sendFrameToServer()
+{
+    const char *payload = (const char *)&hFrame.frame;
+    size_t length = DESIOT_FIXED_COMPOMENTS_LENGTH + hFrame.frame.dataPacket.dataLen;
+    uint16_t packetID = mqttClient.publish(DESIOT_MQTT_PUBLISH_TOPIC, 2, false, payload, length);
+    if (!packetID)
+        Serial.printf("\r\nPublish failed");
+}
+
+void connectToMqtt()
+{
+    if (!mqttClient.connected())
+    {
+        Serial.println("Connecting to MQTT...");
+        mqttClient.connect();
+    }
+}
+
+void WiFiEvent(WiFiEvent_t event)
+{
+    Serial.printf("[WiFi-event] event: %d\n", event);
+    switch (event)
+    {
+    case SYSTEM_EVENT_STA_GOT_IP:
+        Serial.println("WiFi connected");
+        Serial.println("IP address: ");
+        Serial.println(WiFi.localIP());
+        connectToMqtt();
+        break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        Serial.println("WiFi lost connection");
+        xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
+        xTimerStart(wifiReconnectTimer, 0);
+        break;
+    }
+}
+
+void onMqttConnect(bool sessionPresent)
+{
+    Serial.println("Connected to MQTT.");
+    Serial.print("Session present: ");
+    Serial.println(sessionPresent);
+    uint16_t packetIdSub = mqttClient.subscribe("test/lol", 2);
+    Serial.print("Subscribing at QoS 2, packetId: ");
+    Serial.println(packetIdSub);
+    mqttClient.publish("test/lol", 0, true, "test 1");
+    Serial.println("Publishing at QoS 0");
+    uint16_t packetIdPub1 = mqttClient.publish("test/lol", 1, true, "test 2");
+    Serial.print("Publishing at QoS 1, packetId: ");
+    Serial.println(packetIdPub1);
+    uint16_t packetIdPub2 = mqttClient.publish("test/lol", 2, true, "test 3");
+    Serial.print("Publishing at QoS 2, packetId: ");
+    Serial.println(packetIdPub2);
+}
+
+void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
+{
+    Serial.println("Disconnected from MQTT.");
+
+    if (WiFi.isConnected())
+    {
+        xTimerStart(mqttReconnectTimer, 0);
+    }
+}
+
+void onMqttSubscribe(uint16_t packetId, uint8_t qos)
+{
+    Serial.println("Subscribe acknowledged.");
+    Serial.print("  packetId: ");
+    Serial.println(packetId);
+    Serial.print("  qos: ");
+    Serial.println(qos);
+}
+
+void onMqttUnsubscribe(uint16_t packetId)
+{
+    Serial.println("Unsubscribe acknowledged.");
+    Serial.print("  packetId: ");
+    Serial.println(packetId);
+}
+
+void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total)
+{
+    Serial.println("Publish received.");
+    Serial.print("  topic: ");
+    Serial.println(topic);
+    Serial.print("  qos: ");
+    Serial.println(properties.qos);
+    Serial.print("  dup: ");
+    Serial.println(properties.dup);
+    Serial.print("  retain: ");
+    Serial.println(properties.retain);
+    Serial.print("  len: ");
+    Serial.println(len);
+    Serial.print("  index: ");
+    Serial.println(index);
+    Serial.print("  total: ");
+    Serial.println(total);
+}
+
+void onMqttPublish(uint16_t packetId)
+{
+    Serial.println("Publish acknowledged.");
+    Serial.print("  packetId: ");
+    Serial.println(packetId);
 }

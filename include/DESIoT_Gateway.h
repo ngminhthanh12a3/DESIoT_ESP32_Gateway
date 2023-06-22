@@ -1,10 +1,17 @@
 #ifndef INC_DESIOT_GATEWAY_H_
 #define INC_DESIOT_GATEWAY_H_
 
+#ifdef ESP32
+#include <Arduino.h>
+#include <AsyncMqttClient.h>
+#include <WiFi.h>
+#endif
+
 // UART
 #include <driver/uart.h>
 #include <soc/uart_struct.h>
 #include <soc/uart_reg.h>
+
 #define DESIOT_UART_NUM UART_NUM_2
 #define DESIOT_CIR_BUF_SIZE 1024u
 
@@ -30,8 +37,10 @@
 #define DESIOT_DATALEN_LEN 0x2u
 
 #define DESIOT_HEAD_FRAME_LEN (DESIOT_HEAD_LEN + DESIOT_CMD_LEN + DESIOT_DATALEN_LEN)
+#define DESIOT_TRAIL_FRAME_LEN DESIOT_TRAIL_LEN + DESIOT_CRC_LEN
+#define DESIOT_FIXED_COMPOMENTS_LENGTH DESIOT_HEAD_FRAME_LEN + DESIOT_TRAIL_FRAME_LEN
 
-void DESIoT_G_begin();
+void DESIoT_UART_begin();
 void DESIoT_G_loop();
 void DESIoT_G_frameArbitrating();
 
@@ -115,15 +124,77 @@ enum DESIOT_HEAD_FRAME_INDEXES
 void DESIoT_CalculateTable_CRC16();
 uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
 
+// MQTT
+#define DESIOT_MQTT_PUBLISH_TOPIC "test/gateway_publish"
+#define DESIOT_MQTT_HOST "192.168.1.220"
+#define DESIOT_MQTT_PORT 1883u
+#define DESIOT_MQTT_USERNAME "username"
+#define DESIOT_MQTT_PASSWORD "password"
+
 void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte);
 void DESIoT_frameFailedHandler();
 void DESIoT_frameSuccessHandler();
 void DESIoT_restartFrameIndexes();
 void DESIoT_frameTimeoutHandler();
+void DESIoT_sendFrameToServer();
+void connectToMqtt();
+
+// MQTT and WiFi events
+void WiFiEvent(WiFiEvent_t event);
+void onMqttConnect(bool sessionPresent);
+void onMqttDisconnect(AsyncMqttClientDisconnectReason reason);
+void onMqttSubscribe(uint16_t packetId, uint8_t qos);
+void onMqttUnsubscribe(uint16_t packetId);
+void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total);
+void onMqttPublish(uint16_t packetId);
+
 #ifdef ESP32
 static intr_handle_t handle_console;
+
+// MQTT and WiFi
+extern AsyncMqttClient mqttClient;
+extern TimerHandle_t mqttReconnectTimer;
+extern TimerHandle_t wifiReconnectTimer;
+
 static void IRAM_ATTR DESIoT_UART_INTR_HANDLE(void *arg);
 unsigned long DESIoT_millis();
 #endif
+
+// static functions
+static void connectToWifi()
+{
+#if defined(DESIOT_USER_WIFI_SSID) && defined(DESIOT_USER_WIFI_PASSWORD)
+    if (!WiFi.isConnected())
+    {
+        Serial.println("Connecting to Wi-Fi...");
+        WiFi.begin(DESIOT_USER_WIFI_SSID, DESIOT_USER_WIFI_PASSWORD);
+    }
+#endif
+}
+
+static void DESIoT_MQTT_begin()
+{
+    mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
+    wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
+
+    WiFi.onEvent(WiFiEvent);
+
+    mqttClient.onConnect(onMqttConnect);
+    mqttClient.onDisconnect(onMqttDisconnect);
+    mqttClient.onSubscribe(onMqttSubscribe);
+    mqttClient.onUnsubscribe(onMqttUnsubscribe);
+    mqttClient.onMessage(onMqttMessage);
+    mqttClient.onPublish(onMqttPublish);
+    mqttClient.setServer(DESIOT_MQTT_HOST, DESIOT_MQTT_PORT);
+    mqttClient.setCredentials(DESIOT_MQTT_USERNAME, DESIOT_MQTT_PASSWORD);
+    // mqttClient.setClientId();
+    connectToWifi();
+}
+
+static void DESIoT_G_begin()
+{
+    DESIoT_UART_begin();
+    DESIoT_MQTT_begin();
+}
 
 #endif /* INC_DESIOT_GATEWAY_H_ */
