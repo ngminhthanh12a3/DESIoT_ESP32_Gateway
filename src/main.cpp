@@ -1,6 +1,6 @@
 #define DESIOT_USER_WIFI_SSID "ThanhNguyen_test"
 #define DESIOT_USER_WIFI_PASSWORD "nguyent1220"
-
+#define DESIOT_USER_GATEWAY_ID "64953a3c976b713b0f840520"
 // #include <Arduino.h>
 #include "DESIoT_Gateway.h"
 

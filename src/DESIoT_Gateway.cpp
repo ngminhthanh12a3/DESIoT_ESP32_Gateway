@@ -13,7 +13,7 @@ unsigned long DESIoT_millis()
 }
 #endif
 
-DESIoT_CBUF_t hUARTCBuffer = {.start = 0, .end = 0};
+DESIoT_CBUF_t hUART2CBuffer = {.start = 0, .end = 0};
 DESIoT_Frame_Hander_t hFrame = {.index = 0};
 
 void DESIoT_UART_begin()
@@ -37,7 +37,7 @@ void DESIoT_UART_begin()
         .rx_flow_ctrl_thresh = 122};
     // Configure UART parameters
     ESP_ERROR_CHECK(uart_param_config(DESIOT_UART_NUM, &uart_config));
-    // Set UART pins (using UART0 default pins ie no changes.)
+    // Set UART pins (using UART2 default pins ie no changes.)
     ESP_ERROR_CHECK(uart_set_pin(DESIOT_UART_NUM, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     QueueHandle_t uart_queue;
     // Install UART driver using an event queue here
@@ -72,7 +72,7 @@ static void IRAM_ATTR DESIoT_UART_INTR_HANDLE(void *arg)
     while (rx_fifo_len)
     {
         uint8_t uart_byte = UART2.fifo.rw_byte; // read all bytes
-        DESIoT_CBUF_putByte(&hUARTCBuffer, uart_byte);
+        DESIoT_CBUF_putByte(&hUART2CBuffer, uart_byte);
         rx_fifo_len--;
     }
     // after reading bytes from buffer clear UART interrupt status
@@ -204,13 +204,13 @@ uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN)
 
 void DESIoT_G_frameArbitrating()
 {
-    // arbitrating for UART0
-    if (hFrame.status == DESIOT_FRAME_IDLE || hFrame.status == DESIOT_FRAME_IN_UART0_PROGRESS)
+    // arbitrating for UART2
+    if (hFrame.status == DESIOT_FRAME_IDLE || hFrame.status == DESIOT_FRAME_IN_UART2_PROGRESS)
     {
         uint8_t rx;
-        if (DESIoT_CBUF_getByte(&hUARTCBuffer, &rx) == DESIOT_CBUF_OK)
+        if (DESIoT_CBUF_getByte(&hUART2CBuffer, &rx) == DESIOT_CBUF_OK)
         {
-            hFrame.status = DESIOT_FRAME_IN_UART0_PROGRESS;
+            hFrame.status = DESIOT_FRAME_IN_UART2_PROGRESS;
             DESIoT_FRAME_parsing(&hFrame, rx);
         }
     }
@@ -220,9 +220,9 @@ void DESIoT_frameFailedHandler()
 {
     switch (hFrame.status)
     {
-    case DESIOT_FRAME_UART0_FAILED:
+    case DESIOT_FRAME_UART2_FAILED:
         DESIoT_restartFrameIndexes();
-        Serial.printf("\r\nUART0 Failed");
+        Serial.printf("\r\nUART2 Failed");
         break;
     }
 }
@@ -230,10 +230,10 @@ void DESIoT_frameSuccessHandler()
 {
     switch (hFrame.status)
     {
-    case DESIOT_FRAME_UART0_SUCCESS:
+    case DESIOT_FRAME_UART2_SUCCESS:
         DESIoT_restartFrameIndexes();
-        // // Serial.printf("\r\nUART0 Success");
-        DESIoT_sendFrameToServer();
+        // // Serial.printf("\r\nUART2 Success");
+        DESIoT_sendFrameToServer(DESIOT_SERIAL_CONNECTION_TYPE, DESIOT_UART2_ID);
         break;
 
     default:
@@ -257,12 +257,33 @@ void DESIoT_frameTimeoutHandler()
         }
 }
 
-void DESIoT_sendFrameToServer()
+void DESIoT_sendFrameToServer(uint8_t connection_type, uint8_t connection_id)
 {
     char *payload = (char *)&hFrame.frame;
+
+    // check data length
+    if (hFrame.frame.dataPacket.dataLen + DESIOT_ADDITIONAL_GATEWAY_FRAME_SIZE <= sizeof(hFrame.frame.dataPacket.data))
+    {
+        // shift data of data packet of 14 bytes
+        memmove(hFrame.frame.dataPacket.data + DESIOT_ADDITIONAL_GATEWAY_FRAME_SIZE, hFrame.frame.dataPacket.data, hFrame.frame.dataPacket.dataLen);
+        hFrame.frame.dataPacket.dataLen += DESIOT_ADDITIONAL_GATEWAY_FRAME_SIZE;
+
+        DESIoT_additionalGatewayData_t *additionalGatewayData = (DESIoT_additionalGatewayData_t *)hFrame.frame.dataPacket.data;
+
+        memcpy(additionalGatewayData->gateway_id, hFrame.gateway_id, sizeof(hFrame.gateway_id));
+        // additionalGatewayData->gateway_id =
+        additionalGatewayData->connection_type = connection_type;
+        additionalGatewayData->connection_id = connection_id;
+
+        // crc
+        hFrame.frame.crc = DESIoT_Compute_CRC16((uint8_t *)&hFrame.frame.dataPacket, DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + hFrame.frame.dataPacket.dataLen);
+    }
+    else
+        return;
+
     size_t length = DESIOT_FIXED_COMPOMENTS_LENGTH + hFrame.frame.dataPacket.dataLen;
-    
-    //shift trail frame
+
+    // shift trail frame
     char *pTrailFrame = payload + DESIOT_HEAD_FRAME_LEN + hFrame.frame.dataPacket.dataLen;
     memcpy(pTrailFrame, &hFrame.frame.t1, DESIOT_TRAIL_FRAME_LEN);
 
@@ -369,4 +390,15 @@ void onMqttPublish(uint16_t packetId)
     Serial.println("Publish acknowledged.");
     Serial.print("  packetId: ");
     Serial.println(packetId);
+}
+
+void DESIoT_hexToU8Array(const char *hexStr, uint8_t *buf, size_t bufSize)
+{
+    const char *pos = hexStr;
+    /* WARNING: no sanitization or error-checking whatsoever */
+    for (size_t i = 0; i < bufSize / sizeof(*buf); i++)
+    {
+        sscanf(pos, "%2hhx", &buf[i]);
+        pos += 2;
+    }
 }

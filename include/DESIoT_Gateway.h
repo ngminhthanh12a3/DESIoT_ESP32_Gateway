@@ -14,6 +14,10 @@
 
 #define DESIOT_UART_NUM UART_NUM_2
 #define DESIOT_CIR_BUF_SIZE 1024u
+#define DESIOT_GATEWAYID_SIZE 12u
+#define DESIOT_CONNECTION_TYPE_SIZE 1u
+#define DESIOT_CONNECTION_ID_SIZE 1u
+#define DESIOT_ADDITIONAL_GATEWAY_FRAME_SIZE DESIOT_GATEWAYID_SIZE + DESIOT_CONNECTION_TYPE_SIZE + DESIOT_CONNECTION_ID_SIZE
 
 // attributes
 #define DESIOT_ATT_PACKED __attribute__((__packed__))
@@ -73,6 +77,13 @@ typedef struct
 
 typedef struct
 {
+    uint8_t gateway_id[12];
+    uint8_t connection_type;
+    uint8_t connection_id;
+} DESIoT_additionalGatewayData_t;
+
+typedef struct
+{
     uint8_t h1;
     uint8_t h2;
     DESIoT_dataPacket_t dataPacket;
@@ -91,6 +102,7 @@ typedef struct
     uint8_t status;
     uint64_t millis;
     DESIoT_Frame_t frame;
+    uint8_t gateway_id[DESIOT_GATEWAYID_SIZE];
 } DESIoT_Frame_Hander_t;
 
 #define DESIOT_SET_FRAME_FAILED_STATUS(status) status--
@@ -100,9 +112,9 @@ typedef struct
 enum DESIOT_FRAME_STATUSES
 {
     DESIOT_FRAME_IDLE,
-    DESIOT_FRAME_UART0_SUCCESS,
-    DESIOT_FRAME_UART0_FAILED,
-    DESIOT_FRAME_IN_UART0_PROGRESS
+    DESIOT_FRAME_UART2_SUCCESS,
+    DESIOT_FRAME_UART2_FAILED,
+    DESIOT_FRAME_IN_UART2_PROGRESS
 };
 
 enum DESIOT_HEAD_FRAME_INDEXES
@@ -126,17 +138,29 @@ uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
 
 // MQTT
 #define DESIOT_MQTT_PUBLISH_TOPIC "test/gateway_publish"
-#define DESIOT_MQTT_HOST "192.168.1.220"
+#define DESIOT_MQTT_HOST "192.168.109.220"
 #define DESIOT_MQTT_PORT 1883u
 #define DESIOT_MQTT_USERNAME "username"
 #define DESIOT_MQTT_PASSWORD "password"
+
+// Connection types
+enum DESIOT_CONNECTION_TYPES
+{
+    DESIOT_SERIAL_CONNECTION_TYPE
+};
+
+// Connection IDs
+enum DESIOT_CONNECTION_IDS
+{
+    DESIOT_UART2_ID
+};
 
 void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte);
 void DESIoT_frameFailedHandler();
 void DESIoT_frameSuccessHandler();
 void DESIoT_restartFrameIndexes();
 void DESIoT_frameTimeoutHandler();
-void DESIoT_sendFrameToServer();
+void DESIoT_sendFrameToServer(uint8_t connection_type, uint8_t connection_id);
 void connectToMqtt();
 
 // MQTT and WiFi events
@@ -150,6 +174,7 @@ void onMqttPublish(uint16_t packetId);
 
 #ifdef ESP32
 static intr_handle_t handle_console;
+extern DESIoT_Frame_Hander_t hFrame;
 
 // MQTT and WiFi
 extern AsyncMqttClient mqttClient;
@@ -159,6 +184,9 @@ extern TimerHandle_t wifiReconnectTimer;
 static void IRAM_ATTR DESIoT_UART_INTR_HANDLE(void *arg);
 unsigned long DESIoT_millis();
 #endif
+
+// String to HEX
+void DESIoT_hexToU8Array(const char *hexStr, uint8_t *buf, size_t bufSize);
 
 // static functions
 static void connectToWifi()
@@ -195,6 +223,11 @@ static void DESIoT_G_begin()
 {
     DESIoT_UART_begin();
     DESIoT_MQTT_begin();
+
+    //
+#if defined(DESIOT_USER_GATEWAY_ID)
+    DESIoT_hexToU8Array(DESIOT_USER_GATEWAY_ID, hFrame.gateway_id, sizeof(hFrame.gateway_id));
+#endif
 }
 
 #endif /* INC_DESIOT_GATEWAY_H_ */
