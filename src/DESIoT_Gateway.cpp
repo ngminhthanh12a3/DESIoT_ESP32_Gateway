@@ -18,14 +18,6 @@ DESIoT_Frame_Hander_t hFrame = {.index = 0};
 
 void DESIoT_UART_begin()
 {
-#if defined(DESIOT_WIFI_PASSWORD)
-    Serial.println("DESIOT_WIFI_PASSWORD");
-    Serial.println(DESIOT_WIFI_PASSWORD);
-#endif
-#if defined(DESIOT_WIFI_PASSWORD)
-    Serial.println("DESIOT_WIFI_PASSWORD");
-    Serial.println(DESIOT_WIFI_PASSWORD);
-#endif
 #ifdef ESP32
     // UART setup
     uart_config_t uart_config = {
@@ -98,7 +90,8 @@ void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx)
 }
 
 void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
-{
+{   
+    Serial.printf("\r\n%2X", byte);
     switch (hFrame->index)
     {
     case DESIOT_H1_INDEX:
