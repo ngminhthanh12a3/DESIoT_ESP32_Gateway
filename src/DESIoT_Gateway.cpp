@@ -90,8 +90,7 @@ void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx)
 }
 
 void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
-{   
-    Serial.printf("\r\n%2X", byte);
+{  
     switch (hFrame->index)
     {
     case DESIOT_H1_INDEX:
@@ -383,15 +382,4 @@ void onMqttPublish(uint16_t packetId)
     Serial.println("Publish acknowledged.");
     Serial.print("  packetId: ");
     Serial.println(packetId);
-}
-
-void DESIoT_hexToU8Array(const char *hexStr, uint8_t *buf, size_t bufSize)
-{
-    const char *pos = hexStr;
-    /* WARNING: no sanitization or error-checking whatsoever */
-    for (size_t i = 0; i < bufSize / sizeof(*buf); i++)
-    {
-        sscanf(pos, "%2hhx", &buf[i]);
-        pos += 2;
-    }
 }

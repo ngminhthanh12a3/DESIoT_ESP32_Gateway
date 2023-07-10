@@ -14,7 +14,7 @@
 
 #define DESIOT_UART_NUM UART_NUM_2
 #define DESIOT_CIR_BUF_SIZE 1024u
-#define DESIOT_GATEWAYID_SIZE 12u
+#define DESIOT_GATEWAYID_SIZE 25u
 #define DESIOT_CONNECTION_TYPE_SIZE 1u
 #define DESIOT_CONNECTION_ID_SIZE 1u
 #define DESIOT_ADDITIONAL_GATEWAY_FRAME_SIZE DESIOT_GATEWAYID_SIZE + DESIOT_CONNECTION_TYPE_SIZE + DESIOT_CONNECTION_ID_SIZE
@@ -77,7 +77,7 @@ typedef struct
 
 typedef struct
 {
-    uint8_t gateway_id[12];
+    uint8_t gateway_id[DESIOT_GATEWAYID_SIZE];
     uint8_t connection_type;
     uint8_t connection_id;
 } DESIoT_additionalGatewayData_t;
@@ -102,7 +102,7 @@ typedef struct
     uint8_t status;
     uint64_t millis;
     DESIoT_Frame_t frame;
-    uint8_t gateway_id[DESIOT_GATEWAYID_SIZE];
+    char gateway_id[DESIOT_GATEWAYID_SIZE];
 } DESIoT_Frame_Hander_t;
 
 #define DESIOT_SET_FRAME_FAILED_STATUS(status) status--
@@ -185,9 +185,6 @@ static void IRAM_ATTR DESIoT_UART_INTR_HANDLE(void *arg);
 unsigned long DESIoT_millis();
 #endif
 
-// String to HEX
-void DESIoT_hexToU8Array(const char *hexStr, uint8_t *buf, size_t bufSize);
-
 // static functions
 static void connectToWifi()
 {
@@ -226,7 +223,9 @@ static void DESIoT_G_begin()
 
     //
 #if defined(DESIOT_USER_GATEWAY_ID)
-    DESIoT_hexToU8Array(DESIOT_USER_GATEWAY_ID, hFrame.gateway_id, sizeof(hFrame.gateway_id));
+    strcpy(hFrame.gateway_id, DESIOT_USER_GATEWAY_ID);
+    Serial.println(hFrame.gateway_id);
+    Serial.println(DESIOT_USER_GATEWAY_ID);
 #endif
 }
 
