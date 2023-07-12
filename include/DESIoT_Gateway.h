@@ -103,6 +103,7 @@ typedef struct
     uint64_t millis;
     DESIoT_Frame_t frame;
     char gateway_id[DESIOT_GATEWAYID_SIZE];
+    char mqttTopic[14 + DESIOT_GATEWAYID_SIZE];
 } DESIoT_Frame_Hander_t;
 
 #define DESIOT_SET_FRAME_FAILED_STATUS(status) status--
@@ -112,9 +113,14 @@ typedef struct
 enum DESIOT_FRAME_STATUSES
 {
     DESIOT_FRAME_IDLE,
+    //
     DESIOT_FRAME_UART2_SUCCESS,
     DESIOT_FRAME_UART2_FAILED,
-    DESIOT_FRAME_IN_UART2_PROGRESS
+    DESIOT_FRAME_IN_UART2_PROGRESS,
+    //
+    DESIOT_FRAME_MQTT_SUCCESS,
+    DESIOT_FRAME_MQTT_FAILED,
+    DESIOT_FRAME_IN_MQTT_PROGRESS,
 };
 
 enum DESIOT_HEAD_FRAME_INDEXES
@@ -138,6 +144,7 @@ uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
 
 // MQTT
 #define DESIOT_MQTT_PUBLISH_TOPIC "test/gateway_publish"
+#define DESIOT_DESIIOT_MQTT_TOPIC_PREFIX "test/gateway/"
 #define DESIOT_MQTT_HOST "192.168.1.220"
 #define DESIOT_MQTT_PORT 1883u
 #define DESIOT_MQTT_USERNAME "username"
@@ -161,6 +168,7 @@ void DESIoT_frameSuccessHandler();
 void DESIoT_restartFrameIndexes();
 void DESIoT_frameTimeoutHandler();
 void DESIoT_sendFrameToServer(uint8_t connection_type, uint8_t connection_id);
+void DESIoT_sendFrameToDevice();
 void connectToMqtt();
 
 // MQTT and WiFi events
@@ -224,8 +232,10 @@ static void DESIoT_G_begin()
     //
 #if defined(DESIOT_USER_GATEWAY_ID)
     strcpy(hFrame.gateway_id, DESIOT_USER_GATEWAY_ID);
-    Serial.println(hFrame.gateway_id);
-    Serial.println(DESIOT_USER_GATEWAY_ID);
+    char topic[] = DESIOT_DESIIOT_MQTT_TOPIC_PREFIX;
+    strcpy(hFrame.mqttTopic, topic);
+    strcat(hFrame.mqttTopic, DESIOT_USER_GATEWAY_ID);
+
 #endif
 }
 

@@ -14,6 +14,7 @@ unsigned long DESIoT_millis()
 #endif
 
 DESIoT_CBUF_t hUART2CBuffer = {.start = 0, .end = 0};
+DESIoT_CBUF_t hMQTTCBuffer = {.start = 0, .end = 0};
 DESIoT_Frame_Hander_t hFrame = {.index = 0};
 
 void DESIoT_UART_begin()
@@ -90,7 +91,7 @@ void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx)
 }
 
 void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
-{  
+{
     switch (hFrame->index)
     {
     case DESIOT_H1_INDEX:
@@ -206,6 +207,16 @@ void DESIoT_G_frameArbitrating()
             DESIoT_FRAME_parsing(&hFrame, rx);
         }
     }
+    // arbitrating for MQTT
+    if (hFrame.status == DESIOT_FRAME_IDLE || hFrame.status == DESIOT_FRAME_IN_MQTT_PROGRESS)
+    {
+        uint8_t rx;
+        if (DESIoT_CBUF_getByte(&hMQTTCBuffer, &rx) == DESIOT_CBUF_OK)
+        {
+            hFrame.status = DESIOT_FRAME_IN_MQTT_PROGRESS;
+            DESIoT_FRAME_parsing(&hFrame, rx);
+        }
+    }
 }
 
 void DESIoT_frameFailedHandler()
@@ -213,8 +224,12 @@ void DESIoT_frameFailedHandler()
     switch (hFrame.status)
     {
     case DESIOT_FRAME_UART2_FAILED:
-        DESIoT_restartFrameIndexes();
         Serial.printf("\r\nUART2 Failed");
+        DESIoT_restartFrameIndexes();
+        break;
+    case DESIOT_FRAME_MQTT_FAILED:
+        Serial.printf("\r\nMQTT Failed");
+        DESIoT_restartFrameIndexes();
         break;
     }
 }
@@ -223,9 +238,12 @@ void DESIoT_frameSuccessHandler()
     switch (hFrame.status)
     {
     case DESIOT_FRAME_UART2_SUCCESS:
-        DESIoT_restartFrameIndexes();
-        // // Serial.printf("\r\nUART2 Success");
         DESIoT_sendFrameToServer(DESIOT_SERIAL_CONNECTION_TYPE, DESIOT_UART2_ID);
+        DESIoT_restartFrameIndexes();
+        break;
+    case DESIOT_FRAME_MQTT_SUCCESS:
+        DESIoT_sendFrameToDevice();
+        DESIoT_restartFrameIndexes();
         break;
 
     default:
@@ -283,9 +301,43 @@ void DESIoT_sendFrameToServer(uint8_t connection_type, uint8_t connection_id)
     if (!packetID)
         Serial.printf("\r\nPublish failed");
     else
-        printf("\r\nPublish successfully with %d bytes of data", length);
+    {
+        // printf("\r\nPublish successfully with %d bytes of data", length);
+    }
 }
 
+void DESIoT_sendFrameToDevice()
+{
+    char *src = (char *)&hFrame.frame;
+    uint8_t connection_type = hFrame.frame.dataPacket.data[0], connection_id = hFrame.frame.dataPacket.data[1];
+
+    // shift data.
+    size_t shift_value = DESIOT_ADDITIONAL_GATEWAY_FRAME_SIZE - DESIOT_GATEWAYID_SIZE;
+    hFrame.frame.dataPacket.dataLen -= shift_value;
+    memmove(hFrame.frame.dataPacket.data, hFrame.frame.dataPacket.data + shift_value, hFrame.frame.dataPacket.dataLen);
+
+    // crc
+    hFrame.frame.crc = DESIoT_Compute_CRC16((uint8_t *)&hFrame.frame.dataPacket, DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + hFrame.frame.dataPacket.dataLen);
+
+    size_t length = DESIOT_FIXED_COMPOMENTS_LENGTH + hFrame.frame.dataPacket.dataLen;
+
+    // shift trail frame
+    char *pTrailFrame = src + DESIOT_HEAD_FRAME_LEN + hFrame.frame.dataPacket.dataLen;
+    memcpy(pTrailFrame, &hFrame.frame.t1, DESIOT_TRAIL_FRAME_LEN);
+
+    if (connection_type == DESIOT_SERIAL_CONNECTION_TYPE)
+    {
+        switch (connection_id)
+        {
+        case DESIOT_UART2_ID:
+            uart_tx_chars(DESIOT_UART_NUM, src, length);
+            break;
+
+        default:
+            break;
+        }
+    }
+}
 void connectToMqtt()
 {
     if (!mqttClient.connected())
@@ -319,17 +371,9 @@ void onMqttConnect(bool sessionPresent)
     Serial.println("Connected to MQTT.");
     Serial.print("Session present: ");
     Serial.println(sessionPresent);
-    uint16_t packetIdSub = mqttClient.subscribe("test/lol", 2);
+    uint16_t packetIdSub = mqttClient.subscribe(hFrame.mqttTopic, 2);
     Serial.print("Subscribing at QoS 2, packetId: ");
     Serial.println(packetIdSub);
-    mqttClient.publish("test/lol", 0, true, "test 1");
-    Serial.println("Publishing at QoS 0");
-    uint16_t packetIdPub1 = mqttClient.publish("test/lol", 1, true, "test 2");
-    Serial.print("Publishing at QoS 1, packetId: ");
-    Serial.println(packetIdPub1);
-    uint16_t packetIdPub2 = mqttClient.publish("test/lol", 2, true, "test 3");
-    Serial.print("Publishing at QoS 2, packetId: ");
-    Serial.println(packetIdPub2);
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
@@ -360,26 +404,19 @@ void onMqttUnsubscribe(uint16_t packetId)
 
 void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total)
 {
-    Serial.println("Publish received.");
-    Serial.print("  topic: ");
-    Serial.println(topic);
-    Serial.print("  qos: ");
-    Serial.println(properties.qos);
-    Serial.print("  dup: ");
-    Serial.println(properties.dup);
-    Serial.print("  retain: ");
-    Serial.println(properties.retain);
-    Serial.print("  len: ");
-    Serial.println(len);
-    Serial.print("  index: ");
-    Serial.println(index);
-    Serial.print("  total: ");
-    Serial.println(total);
+
+    if (strcmp(topic, hFrame.mqttTopic) == 0)
+    {
+        for (size_t i = 0; i < len; i++)
+        {
+            DESIoT_CBUF_putByte(&hMQTTCBuffer, payload[i]);
+        }
+    }
 }
 
 void onMqttPublish(uint16_t packetId)
 {
-    Serial.println("Publish acknowledged.");
-    Serial.print("  packetId: ");
-    Serial.println(packetId);
+    // Serial.println("Publish acknowledged.");
+    // Serial.print("  packetId: ");
+    // Serial.println(packetId);
 }
