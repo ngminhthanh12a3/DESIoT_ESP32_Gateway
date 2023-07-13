@@ -1,5 +1,12 @@
 # Semantic versioning
 
+## 1.10.0
+
+`13-07-2023`
+
+- Decrypt value when receiving MQTT frame success.
+  - 
+
 ## 1.9.0
 
 `13-07-2023`

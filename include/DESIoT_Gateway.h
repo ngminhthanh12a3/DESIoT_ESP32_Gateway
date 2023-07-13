@@ -51,6 +51,7 @@
 #include "rfc7539.h"
 #include "env.h"
 void DESIoT_encryptData();
+uint8_t DESIoT_decryptData();
 #endif
 
 void DESIoT_UART_begin();

@@ -242,9 +242,18 @@ void DESIoT_frameSuccessHandler()
         DESIoT_restartFrameIndexes();
         break;
     case DESIOT_FRAME_MQTT_SUCCESS:
-        DESIoT_sendFrameToDevice();
+    {
+#ifdef DESIOT_ENCRYPTION_ENABLED
+
+        uint8_t tagMatch = DESIoT_decryptData();
+        if (tagMatch)
+#endif
+        {
+            DESIoT_sendFrameToDevice();
+        }
         DESIoT_restartFrameIndexes();
         break;
+    }
 
     default:
         break;
@@ -448,5 +457,29 @@ void DESIoT_encryptData()
 
     uint8_t *tag = hFrame.frame.dataPacket.data;
     rfc7539_finish(&ctx, sizeof(aad), n, tag);
+}
+
+uint8_t DESIoT_decryptData()
+{
+    uint8_t *ciphertext = hFrame.frame.dataPacket.data + DESIOT_ENCRYPT_TAG_SIZE, *plaintext = ciphertext;
+    size_t n = hFrame.frame.dataPacket.dataLen - DESIOT_ENCRYPT_TAG_SIZE;
+    chacha20poly1305_ctx ctx;
+    rfc7539_init(&ctx, key, nonce);
+    rfc7539_auth(&ctx, aad, sizeof(aad));
+    chacha20poly1305_decrypt(&ctx, ciphertext, plaintext, n);
+
+    uint8_t *tag = hFrame.frame.dataPacket.data;
+    uint8_t computedTag[DESIOT_ENCRYPT_TAG_SIZE];
+    rfc7539_finish(&ctx, sizeof(aad), n, computedTag);
+
+    uint8_t tagMatch = !memcmp(computedTag, tag, DESIOT_ENCRYPT_TAG_SIZE);
+
+    if (tagMatch) // shift data
+    {
+        memmove(hFrame.frame.dataPacket.data, plaintext, n);
+        hFrame.frame.dataPacket.dataLen = n;
+    }
+
+    return tagMatch;
 }
 #endif
