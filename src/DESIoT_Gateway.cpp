@@ -285,6 +285,10 @@ void DESIoT_sendFrameToServer(uint8_t connection_type, uint8_t connection_id)
         additionalGatewayData->connection_type = connection_type;
         additionalGatewayData->connection_id = connection_id;
 
+#ifdef DESIOT_ENCRYPTION_ENABLED
+        DESIoT_encryptData();
+#endif
+
         // crc
         hFrame.frame.crc = DESIoT_Compute_CRC16((uint8_t *)&hFrame.frame.dataPacket, DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + hFrame.frame.dataPacket.dataLen);
     }
@@ -420,3 +424,29 @@ void onMqttPublish(uint16_t packetId)
     // Serial.print("  packetId: ");
     // Serial.println(packetId);
 }
+
+#ifdef DESIOT_ENCRYPTION_ENABLED
+
+uint8_t aad[12] = {ENV_AAD};
+uint8_t key[32] = {ENV_KEY};
+uint8_t nonce[] = {ENV_NONCE};
+void DESIoT_encryptData()
+{
+    // shift data
+    memmove(hFrame.frame.dataPacket.data + DESIOT_ENCRYPT_TAG_SIZE, hFrame.frame.dataPacket.data, hFrame.frame.dataPacket.dataLen);
+
+    uint8_t *actual_plaintext = hFrame.frame.dataPacket.data + DESIOT_ENCRYPT_TAG_SIZE;
+    uint8_t *ciphertext = actual_plaintext;
+    size_t n = hFrame.frame.dataPacket.dataLen;
+
+    hFrame.frame.dataPacket.dataLen += DESIOT_ENCRYPT_TAG_SIZE;
+    chacha20poly1305_ctx ctx;
+
+    rfc7539_init(&ctx, key, nonce);
+    rfc7539_auth(&ctx, aad, sizeof(aad));
+    chacha20poly1305_encrypt(&ctx, actual_plaintext, ciphertext, n);
+
+    uint8_t *tag = hFrame.frame.dataPacket.data;
+    rfc7539_finish(&ctx, sizeof(aad), n, tag);
+}
+#endif

@@ -44,6 +44,15 @@
 #define DESIOT_TRAIL_FRAME_LEN DESIOT_TRAIL_LEN + DESIOT_CRC_LEN
 #define DESIOT_FIXED_COMPOMENTS_LENGTH DESIOT_HEAD_FRAME_LEN + DESIOT_TRAIL_FRAME_LEN
 
+#define DESIOT_ENCRYPTION_ENABLED
+
+#ifdef DESIOT_ENCRYPTION_ENABLED
+#define DESIOT_ENCRYPT_TAG_SIZE 16u
+#include "rfc7539.h"
+#include "env.h"
+void DESIoT_encryptData();
+#endif
+
 void DESIoT_UART_begin();
 void DESIoT_G_loop();
 void DESIoT_G_frameArbitrating();
