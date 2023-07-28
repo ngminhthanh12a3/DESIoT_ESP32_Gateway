@@ -244,7 +244,7 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
             }
             else
             {
-                DESIoT_printf("\r\n\t- CRC failed");
+                DESIoT_printf("\r\n\t- CRC FAILED");
                 DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
             }
         }
@@ -325,11 +325,11 @@ void DESIoT_frameFailedHandler()
     switch (hFrame.status)
     {
     case DESIOT_FRAME_UART2_FAILED:
-        DESIoT_printf("\r\nUART2 Failed");
+        // DESIoT_printf("\r\nUART2 Failed");
         DESIoT_restartFrameIndexes();
         break;
     case DESIOT_FRAME_MQTT_FAILED:
-        DESIoT_printf("\r\nMQTT Failed");
+        // DESIoT_printf("\r\nMQTT Failed");
         DESIoT_restartFrameIndexes();
         break;
     }
