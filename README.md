@@ -1,11 +1,17 @@
 # Semantic versioning
 
+## 1.11.0
+
+`28-07-2023`
+
+- Measure tick in **DESIoT_G_loop**
+- Restart ESP when tick timeout.
+
 ## 1.10.0
 
 `13-07-2023`
 
-- Decrypt value when receiving MQTT frame success.
-  - 
+- ## Decrypt value when receiving MQTT frame success.
 
 ## 1.9.0
 

@@ -111,6 +111,7 @@ typedef struct
     uint8_t index;
     uint8_t status;
     uint64_t millis;
+    uint64_t loopTick;
     DESIoT_Frame_t frame;
     char gateway_id[DESIOT_GATEWAYID_SIZE];
     char mqttTopic[14 + DESIOT_GATEWAYID_SIZE];
@@ -155,7 +156,8 @@ uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
 // MQTT
 #define DESIOT_MQTT_PUBLISH_TOPIC "test/gateway_publish"
 #define DESIOT_DESIIOT_MQTT_TOPIC_PREFIX "test/gateway/"
-#define DESIOT_MQTT_HOST "192.168.1.220"
+// #define DESIOT_MQTT_HOST "192.168.1.220"
+#define DESIOT_MQTT_HOST "cloud.desiot.accesscam.org"
 #define DESIOT_MQTT_PORT 1883u
 #define DESIOT_MQTT_USERNAME "username"
 #define DESIOT_MQTT_PASSWORD "password"
@@ -234,11 +236,22 @@ static void DESIoT_MQTT_begin()
     connectToWifi();
 }
 
+static void DESIoT_loopTickCheck(void *parameter)
+{
+    DESIoT_Frame_Hander_t *phFrame = (DESIoT_Frame_Hander_t *)parameter;
+    for (;;)
+    {
+        if ((int)(DESIoT_millis() - phFrame->loopTick) > 1000)
+            ESP.restart();
+    }
+}
+
 static void DESIoT_G_begin()
 {
+    hFrame.loopTick = DESIoT_millis(); // bug
+
     DESIoT_UART_begin();
     DESIoT_MQTT_begin();
-
     //
 #if defined(DESIOT_USER_GATEWAY_ID)
     strcpy(hFrame.gateway_id, DESIOT_USER_GATEWAY_ID);
@@ -247,6 +260,8 @@ static void DESIoT_G_begin()
     strcat(hFrame.mqttTopic, DESIOT_USER_GATEWAY_ID);
 
 #endif
+
+    xTaskCreate(DESIoT_loopTickCheck, "DESIoT_loopTickCheck", 2000, &hFrame, 1, NULL);
 }
 
 #endif /* INC_DESIOT_GATEWAY_H_ */

@@ -47,6 +47,7 @@ void DESIoT_UART_begin()
 
 void DESIoT_G_loop()
 {
+    hFrame.loopTick = DESIoT_millis();
     DESIoT_frameFailedHandler();
     DESIoT_frameSuccessHandler();
     DESIoT_frameTimeoutHandler();
@@ -141,9 +142,13 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
             hFrame->frame.crcArr[1] = byte;
             uint16_t crcCalculate = DESIoT_Compute_CRC16((uint8_t *)&hFrame->frame.dataPacket, DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + hFrame->frame.dataPacket.dataLen);
             if (crcCalculate == hFrame->frame.crc)
+            {
                 DESIOT_SET_FRAME_SUCCESS_STATUS(hFrame->status);
+                Serial.printf("\r\nFrame parsing successfully!");
+            }
             else
             {
+                Serial.printf("\r\nCRC failed");
                 DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
             }
         }
@@ -315,7 +320,7 @@ void DESIoT_sendFrameToServer(uint8_t connection_type, uint8_t connection_id)
         Serial.printf("\r\nPublish failed");
     else
     {
-        // printf("\r\nPublish successfully with %d bytes of data", length);
+        printf("\r\nPublish successfully with %d bytes of data", length);
     }
 }
 
