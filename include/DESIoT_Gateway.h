@@ -203,7 +203,19 @@ extern TimerHandle_t wifiReconnectTimer;
 
 static void IRAM_ATTR DESIoT_UART_INTR_HANDLE(void *arg);
 unsigned long DESIoT_millis();
+unsigned long DESIoT_micros();
 #endif
+
+#define DESIOT_DEBUG
+size_t DESIoT_printf(const char *format, ...);
+size_t DESIoT_print(const char str[]);
+size_t DESIoT_println(const char c[]);
+size_t DESIoT_println(const Printable &x);
+size_t DESIoT_println(int num, int base = DEC);
+typedef struct
+{
+    size_t comMs;
+} DESIoT_Debug_Hander_t;
 
 // static functions
 static void connectToWifi()

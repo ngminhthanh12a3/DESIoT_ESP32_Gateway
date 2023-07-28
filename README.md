@@ -1,5 +1,13 @@
 # Semantic versioning
 
+## 0.0.0-demo
+
+- Print communication parsing processes.
+  - Print the start of communication.
+  - Print OKs of H1, H2, T1, T2, and CRC.
+  - Print the stop of communications with time.
+  - Print the decrypt and encrypt time.
+
 ## 1.11.0
 
 `28-07-2023`

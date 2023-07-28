@@ -11,11 +11,83 @@ unsigned long DESIoT_millis()
 {
     return millis();
 }
+
+unsigned long DESIoT_micros()
+{
+    return micros();
+}
 #endif
+
+size_t DESIoT_printf(const char *format, ...)
+{
+#ifdef DESIOT_DEBUG
+    char loc_buf[64];
+    char *temp = loc_buf;
+    va_list arg;
+    va_list copy;
+    va_start(arg, format);
+    va_copy(copy, arg);
+    int len = vsnprintf(temp, sizeof(loc_buf), format, copy);
+    va_end(copy);
+    if (len < 0)
+    {
+        va_end(arg);
+        return 0;
+    };
+    if (len >= (int)sizeof(loc_buf))
+    { // comparation of same sign type for the compiler
+        temp = (char *)malloc(len + 1);
+        if (temp == NULL)
+        {
+            va_end(arg);
+            return 0;
+        }
+        len = vsnprintf(temp, len + 1, format, arg);
+    }
+    va_end(arg);
+
+    Serial.print(temp);
+
+    if (temp != loc_buf)
+    {
+        free(temp);
+    }
+    return len;
+#endif
+}
+
+size_t DESIoT_print(const char str[])
+{
+#ifdef DESIOT_DEBUG
+    return Serial.print(str);
+#endif
+}
+
+size_t DESIoT_println(const char c[])
+{
+#ifdef DESIOT_DEBUG
+    return Serial.println(c);
+#endif
+}
+
+size_t DESIoT_println(const Printable &x)
+{
+#ifdef DESIOT_DEBUG
+    return Serial.println(x);
+#endif
+}
+
+size_t DESIoT_println(int num, int base)
+{
+#ifdef DESIOT_DEBUG
+    return Serial.println(num, base);
+#endif
+}
 
 DESIoT_CBUF_t hUART2CBuffer = {.start = 0, .end = 0};
 DESIoT_CBUF_t hMQTTCBuffer = {.start = 0, .end = 0};
 DESIoT_Frame_Hander_t hFrame = {.index = 0};
+DESIoT_Debug_Hander_t hDebug;
 
 void DESIoT_UART_begin()
 {
@@ -96,18 +168,36 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
     switch (hFrame->index)
     {
     case DESIOT_H1_INDEX:
-        hFrame->millis = DESIoT_millis();
-        if (byte == DESIOT_H1_DEFAULT)
-            hFrame->frame.h1 = byte;
-
+        if (hFrame->status == DESIOT_FRAME_IN_UART2_PROGRESS)
+            DESIoT_printf("\r\n- Device ");
         else
+            DESIoT_printf("\r\n- Server ");
+        DESIoT_printf("Communication Start");
+        hFrame->millis = DESIoT_millis();
+        hDebug.comMs = hFrame->millis;
+
+        if (byte == DESIOT_H1_DEFAULT)
+        {
+            hFrame->frame.h1 = byte;
+            DESIoT_printf("\r\n\t- H1 OK ");
+        }
+        else
+        {
             DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+            DESIoT_printf("\r\n\t- H1 FAILED ");
+        }
         break;
     case DESIOT_H2_INDEX:
         if (byte == DESIOT_H2_DEFAULT)
+        {
             hFrame->frame.h2 = byte;
+            DESIoT_printf("\r\n\t- H2 OK ");
+        }
         else
+        {
             DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+            DESIoT_printf("\r\n\t- H2 FAILED ");
+        }
         break;
     case DESIOT_CMD_INDEX:
         hFrame->frame.dataPacket.cmd = byte;
@@ -122,9 +212,15 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
         if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen)) // t1
         {
             if (byte == DESIOT_T1_DEFAULT)
+            {
                 hFrame->frame.t1 = byte;
+                DESIoT_printf("\r\n\t- T1 OK");
+            }
             else
+            {
                 DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+                DESIoT_printf("\r\n\t- T1 FAILED");
+            }
         }
         else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 1)) // t2
         {
@@ -144,11 +240,11 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
             if (crcCalculate == hFrame->frame.crc)
             {
                 DESIOT_SET_FRAME_SUCCESS_STATUS(hFrame->status);
-                Serial.printf("\r\nFrame parsing successfully!");
+                DESIoT_printf("\r\n\t- CRC OK");
             }
             else
             {
-                Serial.printf("\r\nCRC failed");
+                DESIoT_printf("\r\n\t- CRC failed");
                 DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
             }
         }
@@ -229,11 +325,11 @@ void DESIoT_frameFailedHandler()
     switch (hFrame.status)
     {
     case DESIOT_FRAME_UART2_FAILED:
-        Serial.printf("\r\nUART2 Failed");
+        DESIoT_printf("\r\nUART2 Failed");
         DESIoT_restartFrameIndexes();
         break;
     case DESIOT_FRAME_MQTT_FAILED:
-        Serial.printf("\r\nMQTT Failed");
+        DESIoT_printf("\r\nMQTT Failed");
         DESIoT_restartFrameIndexes();
         break;
     }
@@ -244,6 +340,7 @@ void DESIoT_frameSuccessHandler()
     {
     case DESIOT_FRAME_UART2_SUCCESS:
         DESIoT_sendFrameToServer(DESIOT_SERIAL_CONNECTION_TYPE, DESIOT_UART2_ID);
+        DESIoT_printf("\r\n- Device Communication End (%d ms), data length = %d bytes", DESIoT_millis() - hDebug.comMs, hFrame.frame.dataPacket.dataLen);
         DESIoT_restartFrameIndexes();
         break;
     case DESIOT_FRAME_MQTT_SUCCESS:
@@ -255,6 +352,7 @@ void DESIoT_frameSuccessHandler()
 #endif
         {
             DESIoT_sendFrameToDevice();
+            DESIoT_printf("\r\n- Server Communication End (%d ms), data length = %d bytes", DESIoT_millis() - hDebug.comMs, hFrame.frame.dataPacket.dataLen);
         }
         DESIoT_restartFrameIndexes();
         break;
@@ -277,7 +375,7 @@ void DESIoT_frameTimeoutHandler()
         if (DESIoT_millis() - hFrame.millis > DESIOT_TIMEOUT_DURATION)
         {
             DESIoT_restartFrameIndexes();
-            Serial.printf("\r\nFrame timeout");
+            DESIoT_printf("\r\nFrame timeout");
         }
 }
 
@@ -316,11 +414,14 @@ void DESIoT_sendFrameToServer(uint8_t connection_type, uint8_t connection_id)
     memcpy(pTrailFrame, &hFrame.frame.t1, DESIOT_TRAIL_FRAME_LEN);
 
     uint16_t packetID = mqttClient.publish(DESIOT_MQTT_PUBLISH_TOPIC, 2, false, payload, length);
+
     if (!packetID)
-        Serial.printf("\r\nPublish failed");
+    {
+        // DESIoT_printf("\r\n\tPublish failed");
+    }
     else
     {
-        printf("\r\nPublish successfully with %d bytes of data", length);
+        // DESIoT_printf("\r\n\tPublish successfully with %d bytes of data", length);
     }
 }
 
@@ -360,24 +461,24 @@ void connectToMqtt()
 {
     if (!mqttClient.connected())
     {
-        Serial.println("Connecting to MQTT...");
+        DESIoT_println("Connecting to MQTT...");
         mqttClient.connect();
     }
 }
 
 void WiFiEvent(WiFiEvent_t event)
 {
-    Serial.printf("[WiFi-event] event: %d\n", event);
+    DESIoT_printf("[WiFi-event] event: %d\n", event);
     switch (event)
     {
     case SYSTEM_EVENT_STA_GOT_IP:
-        Serial.println("WiFi connected");
-        Serial.println("IP address: ");
-        Serial.println(WiFi.localIP());
+        DESIoT_println("WiFi connected");
+        DESIoT_println("IP address: ");
+        DESIoT_println(WiFi.localIP());
         connectToMqtt();
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
-        Serial.println("WiFi lost connection");
+        DESIoT_println("WiFi lost connection");
         xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
         xTimerStart(wifiReconnectTimer, 0);
         break;
@@ -386,17 +487,17 @@ void WiFiEvent(WiFiEvent_t event)
 
 void onMqttConnect(bool sessionPresent)
 {
-    Serial.println("Connected to MQTT.");
-    Serial.print("Session present: ");
-    Serial.println(sessionPresent);
+    DESIoT_println("Connected to MQTT.");
+    DESIoT_print("Session present: ");
+    DESIoT_println(sessionPresent);
     uint16_t packetIdSub = mqttClient.subscribe(hFrame.mqttTopic, 2);
-    Serial.print("Subscribing at QoS 2, packetId: ");
-    Serial.println(packetIdSub);
+    DESIoT_print("Subscribing at QoS 2, packetId: ");
+    DESIoT_println(packetIdSub);
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 {
-    Serial.println("Disconnected from MQTT.");
+    DESIoT_println("Disconnected from MQTT.");
 
     if (WiFi.isConnected())
     {
@@ -406,18 +507,18 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 
 void onMqttSubscribe(uint16_t packetId, uint8_t qos)
 {
-    Serial.println("Subscribe acknowledged.");
-    Serial.print("  packetId: ");
-    Serial.println(packetId);
-    Serial.print("  qos: ");
-    Serial.println(qos);
+    DESIoT_println("Subscribe acknowledged.");
+    DESIoT_print("  packetId: ");
+    DESIoT_println(packetId);
+    DESIoT_print("  qos: ");
+    DESIoT_println(qos);
 }
 
 void onMqttUnsubscribe(uint16_t packetId)
 {
-    Serial.println("Unsubscribe acknowledged.");
-    Serial.print("  packetId: ");
-    Serial.println(packetId);
+    DESIoT_println("Unsubscribe acknowledged.");
+    DESIoT_print("  packetId: ");
+    DESIoT_println(packetId);
 }
 
 void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total)
@@ -434,9 +535,9 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 
 void onMqttPublish(uint16_t packetId)
 {
-    // Serial.println("Publish acknowledged.");
-    // Serial.print("  packetId: ");
-    // Serial.println(packetId);
+    // DESIoT_println("Publish acknowledged.");
+    // DESIoT_print("  packetId: ");
+    // DESIoT_println(packetId);
 }
 
 #ifdef DESIOT_ENCRYPTION_ENABLED
@@ -455,13 +556,15 @@ void DESIoT_encryptData()
 
     hFrame.frame.dataPacket.dataLen += DESIOT_ENCRYPT_TAG_SIZE;
     chacha20poly1305_ctx ctx;
-
+    unsigned long eUs = DESIoT_micros();
     rfc7539_init(&ctx, key, nonce);
     rfc7539_auth(&ctx, aad, sizeof(aad));
     chacha20poly1305_encrypt(&ctx, actual_plaintext, ciphertext, n);
 
     uint8_t *tag = hFrame.frame.dataPacket.data;
     rfc7539_finish(&ctx, sizeof(aad), n, tag);
+    eUs = DESIoT_micros() - eUs;
+    DESIoT_printf("\r\n\t- Encrypt time %d us", eUs);
 }
 
 uint8_t DESIoT_decryptData()
@@ -469,18 +572,21 @@ uint8_t DESIoT_decryptData()
     uint8_t *ciphertext = hFrame.frame.dataPacket.data + DESIOT_ENCRYPT_TAG_SIZE, *plaintext = ciphertext;
     size_t n = hFrame.frame.dataPacket.dataLen - DESIOT_ENCRYPT_TAG_SIZE;
     chacha20poly1305_ctx ctx;
+    unsigned long dUs = DESIoT_micros();
     rfc7539_init(&ctx, key, nonce);
     rfc7539_auth(&ctx, aad, sizeof(aad));
-    chacha20poly1305_decrypt(&ctx, ciphertext, plaintext, n);
 
+    chacha20poly1305_decrypt(&ctx, ciphertext, plaintext, n);
     uint8_t *tag = hFrame.frame.dataPacket.data;
     uint8_t computedTag[DESIOT_ENCRYPT_TAG_SIZE];
     rfc7539_finish(&ctx, sizeof(aad), n, computedTag);
+    dUs = DESIoT_micros() - dUs;
 
     uint8_t tagMatch = !memcmp(computedTag, tag, DESIOT_ENCRYPT_TAG_SIZE);
 
     if (tagMatch) // shift data
     {
+        DESIoT_printf("\r\n\t- DECRYPT SUCCESSFUL (%ld us)", dUs);
         memmove(hFrame.frame.dataPacket.data, plaintext, n);
         hFrame.frame.dataPacket.dataLen = n;
     }
