@@ -1,5 +1,12 @@
 # Semantic versioning
 
+## 1.13.0
+
+`29-07-2023`
+
+- Flush CBuf to the next headers.
+  - Set this method when
+
 ## 1.12.0
 
 `29-07-2023`

@@ -379,6 +379,15 @@ void DESIoT_restartFrameIndexes()
 void DESIoT_restartCBufIndexes()
 {
     hFrame.curCBuf->start = hFrame.curCBuf->startRestore;
+
+    // Flush to next headers
+    uint16_t currentCBufEnd = hFrame.curCBuf->end;
+    for (; hFrame.curCBuf->start != currentCBufEnd; hFrame.curCBuf->start++)
+    {
+        // check for H1 and H2 mathch
+        if (hFrame.curCBuf->buffer[hFrame.curCBuf->start] == DESIOT_H1_DEFAULT && hFrame.curCBuf->buffer[hFrame.curCBuf->start + 1] == DESIOT_H2_DEFAULT)
+            break;
+    }
 }
 
 void DESIoT_frameTimeoutHandler()
