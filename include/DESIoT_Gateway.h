@@ -61,8 +61,9 @@ void DESIoT_G_frameArbitrating();
 // Circular buffer
 typedef struct
 {
-    uint16_t start;
-    uint16_t end;
+    uint16_t start : 10;
+    uint16_t end : 10;
+    uint16_t startRestore : 10;
     uint8_t buffer[DESIOT_CIR_BUF_SIZE];
 } DESIoT_CBUF_t;
 enum DESIOT_CBUF_STATUS
@@ -113,6 +114,9 @@ typedef struct
     uint64_t millis;
     uint64_t loopTick;
     DESIoT_Frame_t frame;
+
+    DESIoT_CBUF_t *curCBuf;
+
     char gateway_id[DESIOT_GATEWAYID_SIZE];
     char mqttTopic[14 + DESIOT_GATEWAYID_SIZE];
 } DESIoT_Frame_Hander_t;
@@ -145,8 +149,8 @@ enum DESIOT_HEAD_FRAME_INDEXES
 // DESIoT default values
 #define DESIOT_H1_DEFAULT 0x7u
 #define DESIOT_H2_DEFAULT 0x17u
-#define DESIOT_T1_DEFAULT 0x7u
-#define DESIOT_T2_DEFAULT 0x17u
+#define DESIOT_T1_DEFAULT 0x70u
+#define DESIOT_T2_DEFAULT 0x71u
 
 // CRC
 #define DESIOT_CRC_GENERATOR 0x1305
@@ -156,8 +160,8 @@ uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
 // MQTT
 #define DESIOT_MQTT_PUBLISH_TOPIC "test/gateway_publish"
 #define DESIOT_DESIIOT_MQTT_TOPIC_PREFIX "test/gateway/"
-// #define DESIOT_MQTT_HOST "192.168.1.220"
-#define DESIOT_MQTT_HOST "cloud.desiot.accesscam.org"
+#define DESIOT_MQTT_HOST "192.168.1.220"
+// #define DESIOT_MQTT_HOST "cloud.desiot.accesscam.org"
 #define DESIOT_MQTT_PORT 1883u
 #define DESIOT_MQTT_USERNAME "username"
 #define DESIOT_MQTT_PASSWORD "password"
@@ -174,10 +178,12 @@ enum DESIOT_CONNECTION_IDS
     DESIOT_UART2_ID
 };
 
-void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte);
+void DESIoT_setUpStartOfParsing(DESIoT_Frame_Hander_t *hFrame, DESIoT_CBUF_t *curCBuf);
+void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte, DESIoT_CBUF_t *curCBuf);
 void DESIoT_frameFailedHandler();
 void DESIoT_frameSuccessHandler();
 void DESIoT_restartFrameIndexes();
+void DESIoT_restartCBufIndexes();
 void DESIoT_frameTimeoutHandler();
 void DESIoT_sendFrameToServer(uint8_t connection_type, uint8_t connection_id);
 void DESIoT_sendFrameToDevice();
