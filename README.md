@@ -4,7 +4,7 @@
 
 `29-07-2023`
 
-- Change TIMEOUT value. to (10 ms)
+- Change TIMEOUT value. to (1 s)
 
 ## 1.13.0
 
