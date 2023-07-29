@@ -124,7 +124,7 @@ typedef struct
 #define DESIOT_SET_FRAME_FAILED_STATUS(status) status--
 #define DESIOT_SET_FRAME_SUCCESS_STATUS(status) status -= 2
 #define DESIOT_IS_FRAME_ON_PROCESS_STATUS(status) ((status != DESIOT_FRAME_IDLE) && !(status % 3))
-#define DESIOT_TIMEOUT_DURATION 2000
+#define DESIOT_TIMEOUT_DURATION 10
 enum DESIOT_FRAME_STATUSES
 {
     DESIOT_FRAME_IDLE,

@@ -1,5 +1,11 @@
 # Semantic versioning
 
+## 1.14.0
+
+`29-07-2023`
+
+- Change TIMEOUT value. to (10 ms)
+
 ## 1.13.0
 
 `29-07-2023`
