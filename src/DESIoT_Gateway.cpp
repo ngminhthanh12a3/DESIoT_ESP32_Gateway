@@ -150,7 +150,6 @@ uint8_t DESIoT_CBUF_getByte(DESIoT_CBUF_t *hCBuf, uint8_t *rx)
     if (hCBuf->end != hCBuf->start)
     {
         *rx = hCBuf->buffer[hCBuf->start++];
-        hCBuf->start %= DESIOT_CIR_BUF_SIZE;
         return DESIOT_CBUF_OK;
     }
 
@@ -160,10 +159,16 @@ uint8_t DESIoT_CBUF_getByte(DESIoT_CBUF_t *hCBuf, uint8_t *rx)
 void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx)
 {
     hCBuf->buffer[hCBuf->end++] = rx;
-    hCBuf->end %= DESIOT_CIR_BUF_SIZE;
 }
 
-void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
+void DESIoT_setUpStartOfParsing(DESIoT_Frame_Hander_t *hFrame, DESIoT_CBUF_t *curCBuf)
+{
+    hFrame->millis = DESIoT_millis();
+    hFrame->curCBuf = curCBuf;
+    hFrame->curCBuf->startRestore = hFrame->curCBuf->start;
+}
+
+void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte, DESIoT_CBUF_t *curCBuf)
 {
     switch (hFrame->index)
     {
@@ -173,9 +178,8 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
         else
             DESIoT_printf("\r\n- Server ");
         DESIoT_printf("Communication Start");
-        hFrame->millis = DESIoT_millis();
         hDebug.comMs = hFrame->millis;
-
+        DESIoT_setUpStartOfParsing(hFrame, curCBuf);
         if (byte == DESIOT_H1_DEFAULT)
         {
             hFrame->frame.h1 = byte;
@@ -305,7 +309,7 @@ void DESIoT_G_frameArbitrating()
         if (DESIoT_CBUF_getByte(&hUART2CBuffer, &rx) == DESIOT_CBUF_OK)
         {
             hFrame.status = DESIOT_FRAME_IN_UART2_PROGRESS;
-            DESIoT_FRAME_parsing(&hFrame, rx);
+            DESIoT_FRAME_parsing(&hFrame, rx, &hUART2CBuffer);
         }
     }
     // arbitrating for MQTT
@@ -315,23 +319,26 @@ void DESIoT_G_frameArbitrating()
         if (DESIoT_CBUF_getByte(&hMQTTCBuffer, &rx) == DESIOT_CBUF_OK)
         {
             hFrame.status = DESIOT_FRAME_IN_MQTT_PROGRESS;
-            DESIoT_FRAME_parsing(&hFrame, rx);
+            DESIoT_FRAME_parsing(&hFrame, rx, &hMQTTCBuffer);
         }
     }
 }
 
 void DESIoT_frameFailedHandler()
 {
+    uint8_t isFailed = 0;
     switch (hFrame.status)
     {
     case DESIOT_FRAME_UART2_FAILED:
-        // DESIoT_printf("\r\nUART2 Failed");
-        DESIoT_restartFrameIndexes();
-        break;
     case DESIOT_FRAME_MQTT_FAILED:
-        // DESIoT_printf("\r\nMQTT Failed");
-        DESIoT_restartFrameIndexes();
+        isFailed = 1;
         break;
+    }
+
+    if (isFailed)
+    {
+        DESIoT_restartFrameIndexes();
+        DESIoT_restartCBufIndexes();
     }
 }
 void DESIoT_frameSuccessHandler()
@@ -369,13 +376,19 @@ void DESIoT_restartFrameIndexes()
     hFrame.index = 0;
 }
 
+void DESIoT_restartCBufIndexes()
+{
+    hFrame.curCBuf->start = hFrame.curCBuf->startRestore;
+}
+
 void DESIoT_frameTimeoutHandler()
 {
     if (DESIOT_IS_FRAME_ON_PROCESS_STATUS(hFrame.status))
         if (DESIoT_millis() - hFrame.millis > DESIOT_TIMEOUT_DURATION)
         {
             DESIoT_restartFrameIndexes();
-            DESIoT_printf("\r\nFrame timeout");
+            DESIoT_restartCBufIndexes();
+            Serial.printf("\r\nFrame timeout");
         }
 }
 

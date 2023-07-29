@@ -1,5 +1,14 @@
 # Semantic versioning
 
+## 1.12.0
+
+`29-07-2023`
+
+- Change default **TRAILERS** to make it completely different from the default **HEADERS**. (0x70, 0x71)
+- Restore the start point of the CBuffer.
+  - Set the **startRestore** and **curCBuf** in the start of parsing process.
+  - Restore the **start** of **curCBuf** when frame faild or timeout.
+
 ## 0.0.0-demo
 
 - Print communication parsing processes.
