@@ -120,10 +120,8 @@ void DESIoT_UART_begin()
 void DESIoT_G_loop()
 {
     hFrame.loopTick = DESIoT_millis();
-    DESIoT_frameFailedHandler();
-    DESIoT_frameSuccessHandler();
-    DESIoT_frameTimeoutHandler();
     DESIoT_G_frameArbitrating();
+    DESIoT_G_frameProssessLoop();
 }
 
 /*
@@ -161,11 +159,15 @@ void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx)
     hCBuf->buffer[hCBuf->end++] = rx;
 }
 
+uint8_t DESIoT_CBUF_isEmpty(DESIoT_CBUF_t *hCBuf)
+{
+    return hCBuf->end == hCBuf->start;
+}
+
 void DESIoT_setUpStartOfParsing(DESIoT_Frame_Hander_t *hFrame, DESIoT_CBUF_t *curCBuf)
 {
     hFrame->millis = DESIoT_millis();
     hFrame->curCBuf = curCBuf;
-    hFrame->curCBuf->startRestore = hFrame->curCBuf->start;
 }
 
 void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte, DESIoT_CBUF_t *curCBuf)
@@ -179,7 +181,8 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte, DESIoT_CB
             DESIoT_printf("\r\n- Server ");
         DESIoT_printf("Communication Start");
         hDebug.comMs = hFrame->millis;
-        DESIoT_setUpStartOfParsing(hFrame, curCBuf);
+        // set restore point
+        hFrame->curCBuf->startRestore = hFrame->curCBuf->start;
         if (byte == DESIOT_H1_DEFAULT)
         {
             hFrame->frame.h1 = byte;
@@ -300,26 +303,39 @@ uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN)
     return crc;
 }
 
+void DESIoT_G_frameProssessLoop()
+{
+    while (DESIOT_IS_FRAME_ON_PROCESS_STATUS(hFrame.status))
+    {
+        hFrame.loopTick = DESIoT_millis();
+        DESIoT_frameTimeoutHandler();
+
+        uint8_t rx;
+        if (DESIoT_CBUF_getByte(hFrame.curCBuf, &rx) == DESIOT_CBUF_OK)
+            DESIoT_FRAME_parsing(&hFrame, rx, hFrame.curCBuf);
+    }
+    DESIoT_frameFailedHandler();
+    DESIoT_frameSuccessHandler();
+}
+
 void DESIoT_G_frameArbitrating()
 {
     // arbitrating for UART2
-    if (hFrame.status == DESIOT_FRAME_IDLE || hFrame.status == DESIOT_FRAME_IN_UART2_PROGRESS)
+    if (hFrame.status == DESIOT_FRAME_IDLE)
     {
-        uint8_t rx;
-        if (DESIoT_CBUF_getByte(&hUART2CBuffer, &rx) == DESIOT_CBUF_OK)
+        if (!DESIoT_CBUF_isEmpty(&hUART2CBuffer))
         {
             hFrame.status = DESIOT_FRAME_IN_UART2_PROGRESS;
-            DESIoT_FRAME_parsing(&hFrame, rx, &hUART2CBuffer);
+            DESIoT_setUpStartOfParsing(&hFrame, &hUART2CBuffer);
         }
     }
     // arbitrating for MQTT
-    if (hFrame.status == DESIOT_FRAME_IDLE || hFrame.status == DESIOT_FRAME_IN_MQTT_PROGRESS)
+    if (hFrame.status == DESIOT_FRAME_IDLE)
     {
-        uint8_t rx;
-        if (DESIoT_CBUF_getByte(&hMQTTCBuffer, &rx) == DESIOT_CBUF_OK)
+        if (!DESIoT_CBUF_isEmpty(&hMQTTCBuffer))
         {
             hFrame.status = DESIOT_FRAME_IN_MQTT_PROGRESS;
-            DESIoT_FRAME_parsing(&hFrame, rx, &hMQTTCBuffer);
+            DESIoT_setUpStartOfParsing(&hFrame, &hMQTTCBuffer);
         }
     }
 }
