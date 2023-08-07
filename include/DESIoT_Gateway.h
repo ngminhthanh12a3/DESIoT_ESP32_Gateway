@@ -160,8 +160,8 @@ uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
 // MQTT
 #define DESIOT_MQTT_PUBLISH_TOPIC "test/gateway_publish"
 #define DESIOT_DESIIOT_MQTT_TOPIC_PREFIX "test/gateway/"
-#define DESIOT_MQTT_HOST "192.168.1.220"
-// #define DESIOT_MQTT_HOST "cloud.desiot.accesscam.org"
+// #define DESIOT_MQTT_HOST "192.168.1.220"
+#define DESIOT_MQTT_HOST "cloud.desiot.accesscam.org"
 #define DESIOT_MQTT_PORT 1883u
 #define DESIOT_MQTT_USERNAME "username"
 #define DESIOT_MQTT_PASSWORD "password"
