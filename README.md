@@ -1,5 +1,14 @@
 # Semantic versioning
 
+## 1.15.0
+
+`07-08-2023`
+
+- Reconstruct the **DESIoT_G_loop**.
+  - Use only **DESIoT_G_frameArbitrating** and **DESIoT_G_frameProssessLoop**
+  - Use **DESIoT_CBUF_isEmpty** in **DESIoT_G_frameArbitrating** instead;
+  - Set appropriate **hFrame.curCBuf**.
+
 ## 1.14.0
 
 `29-07-2023`
