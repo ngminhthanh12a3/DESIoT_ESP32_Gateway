@@ -1,5 +1,12 @@
 # Semantic versioning
 
+## 1.16.0
+`08-08-2023`
+
+- Implement CBuf selector.
+  - Create CBufSelector struct.
+  - Setup this selector in frame abritrating.
+
 ## 1.15.0
 
 `07-08-2023`
