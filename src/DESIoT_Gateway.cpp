@@ -86,6 +86,7 @@ size_t DESIoT_println(int num, int base)
 
 DESIoT_CBUF_t hUART2CBuffer = {.start = 0, .end = 0};
 DESIoT_CBUF_t hMQTTCBuffer = {.start = 0, .end = 0};
+DESIoT_CBuf_Selector_t hCBufSelector = {.index = 0, .cBufArr = {&hUART2CBuffer, &hMQTTCBuffer}};
 DESIoT_Frame_Hander_t hFrame = {.index = 0};
 DESIoT_Debug_Hander_t hDebug;
 
@@ -320,23 +321,23 @@ void DESIoT_G_frameProssessLoop()
 
 void DESIoT_G_frameArbitrating()
 {
-    // arbitrating for UART2
-    if (hFrame.status == DESIOT_FRAME_IDLE)
+
+    DESIoT_CBUF_t *curCBuf = hCBufSelector.cBufArr[hCBufSelector.index++];
+    if (hFrame.status == DESIOT_FRAME_IDLE && !DESIoT_CBUF_isEmpty(curCBuf))
     {
-        if (!DESIoT_CBUF_isEmpty(&hUART2CBuffer))
+        // arbitrating for UART2
+        if (curCBuf == &hUART2CBuffer)
         {
             hFrame.status = DESIOT_FRAME_IN_UART2_PROGRESS;
-            DESIoT_setUpStartOfParsing(&hFrame, &hUART2CBuffer);
+            Serial.printf("\r\nindex = %d, UART", hCBufSelector.index);
         }
-    }
-    // arbitrating for MQTT
-    if (hFrame.status == DESIOT_FRAME_IDLE)
-    {
-        if (!DESIoT_CBUF_isEmpty(&hMQTTCBuffer))
+        // arbitrating for MQTT
+        else if (curCBuf == &hMQTTCBuffer)
         {
             hFrame.status = DESIOT_FRAME_IN_MQTT_PROGRESS;
-            DESIoT_setUpStartOfParsing(&hFrame, &hMQTTCBuffer);
+            Serial.printf("\r\nindex = %d, MQTT", hCBufSelector.index);
         }
+        DESIoT_setUpStartOfParsing(&hFrame, curCBuf);
     }
 }
 

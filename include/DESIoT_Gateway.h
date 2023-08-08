@@ -66,6 +66,13 @@ typedef struct
     uint16_t startRestore : 10;
     uint8_t buffer[DESIOT_CIR_BUF_SIZE];
 } DESIoT_CBUF_t;
+
+typedef struct
+{
+    uint8_t index : 1;
+    DESIoT_CBUF_t *cBufArr[2];
+} DESIoT_CBuf_Selector_t;
+
 enum DESIOT_CBUF_STATUS
 {
     DESIOT_CBUF_OK,
