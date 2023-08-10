@@ -233,9 +233,15 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte, DESIoT_CB
         else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 1)) // t2
         {
             if (byte == DESIOT_T2_DEFAULT)
+            {
                 hFrame->frame.t2 = byte;
+                DESIoT_printf("\r\n\t- T2 OK");
+            }
             else
+            {
                 DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+                DESIoT_printf("\r\n\t- T2 FAILED");
+            }
         }
         else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 2)) // crc1
         {
@@ -329,13 +335,11 @@ void DESIoT_G_frameArbitrating()
         if (curCBuf == &hUART2CBuffer)
         {
             hFrame.status = DESIOT_FRAME_IN_UART2_PROGRESS;
-            Serial.printf("\r\nindex = %d, UART", hCBufSelector.index);
         }
         // arbitrating for MQTT
         else if (curCBuf == &hMQTTCBuffer)
         {
             hFrame.status = DESIOT_FRAME_IN_MQTT_PROGRESS;
-            Serial.printf("\r\nindex = %d, MQTT", hCBufSelector.index);
         }
         DESIoT_setUpStartOfParsing(&hFrame, curCBuf);
     }
