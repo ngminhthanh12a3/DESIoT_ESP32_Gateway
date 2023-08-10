@@ -1,6 +1,17 @@
 # Semantic versioning
 
+## 0.0.0-CryptoDemo
+
+`10-08-2023`
+
+- Print log in encrypt mode: ignore speeed logs
+  - Set-up of Poly1305 one-time key
+  - Poly1305 one-time key.
+  - ChaCha20 Encryption State.
+  - Poly1305 Tag
+
 ## 1.16.0
+
 `08-08-2023`
 
 - Implement CBuf selector.

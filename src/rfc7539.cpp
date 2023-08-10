@@ -4,6 +4,7 @@
 #include <string.h>
 #include "rfc7539.h"
 #include "ecrypt-portable.h"
+#include "DESIoT_Gateway.h"
 
 // Initialize the ChaCha20 + Poly1305 context for encryption or decryption
 // using a 32 byte key and 12 byte nonce as in the RFC 7539 style.
@@ -17,9 +18,18 @@ void rfc7539_init(chacha20poly1305_ctx *ctx, const uint8_t key[32], const uint8_
     ctx->chacha20.input[14] = U8TO32_LITTLE(nonce + 4);
     ctx->chacha20.input[15] = U8TO32_LITTLE(nonce + 8);
 
+#ifdef DESIOT_CRYPTO_DEBUG
+    DESIoT_print("\r\n\t\t- Set-up of Poly1305 one-time key:");
+    DESIoT_printMatrix((uint8_t*)ctx->chacha20.input, sizeof(ctx->chacha20.input), 3);
+#endif
+
     // Encrypt 64 bytes of zeros and use the first 32 bytes
     // as the Poly1305 key.
     ECRYPT_encrypt_bytes(&ctx->chacha20, block0, block0, 64);
+#ifdef DESIOT_CRYPTO_DEBUG
+    DESIoT_print("\r\n\t\t- Poly1305 one-time key:");
+    DESIoT_printMatrix(block0, sizeof(block0) / 2, 3);
+#endif
     poly1305_init(&ctx->poly1305, block0);
 }
 

@@ -221,11 +221,13 @@ unsigned long DESIoT_micros();
 #endif
 
 #define DESIOT_DEBUG
+#define DESIOT_CRYPTO_DEBUG
 size_t DESIoT_printf(const char *format, ...);
 size_t DESIoT_print(const char str[]);
 size_t DESIoT_println(const char c[]);
 size_t DESIoT_println(const Printable &x);
 size_t DESIoT_println(int num, int base = DEC);
+void DESIoT_printMatrix(uint8_t *matrix, size_t size, size_t level = 0);
 typedef struct
 {
     size_t comMs;
