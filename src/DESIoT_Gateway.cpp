@@ -650,11 +650,11 @@ uint8_t DESIoT_decryptData()
     size_t n = hFrame.frame.dataPacket.dataLen - DESIOT_ENCRYPT_TAG_SIZE;
     chacha20poly1305_ctx ctx;
     unsigned long dUs = DESIoT_micros();
-    DESIoT_print("\r\n\t- ChaCha20-Poly1305 Dencryption Start");
+    DESIoT_print("\r\n\t- ChaCha20-Poly1305 Decryption Start");
     rfc7539_init(&ctx, key, nonce);
     rfc7539_auth(&ctx, aad, sizeof(aad));
     DESIoT_print("\r\n\t\t- Poly1305 function execution for ciphertext.");
-    DESIoT_print("\r\n\t\t- ChaCha20 Dencryption State:");
+    DESIoT_print("\r\n\t\t- ChaCha20 Decryption State:");
 #ifdef DESIOT_CRYPTO_DEBUG
     DESIoT_printMatrix((uint8_t *)ctx.chacha20.input, sizeof(ctx.chacha20.input), 3);
 #endif
@@ -676,7 +676,7 @@ uint8_t DESIoT_decryptData()
         memmove(hFrame.frame.dataPacket.data, plaintext, n);
         hFrame.frame.dataPacket.dataLen = n;
     }
-    DESIoT_print("\r\n\t- ChaCha20-Poly1305 Dencryption End");
+    DESIoT_print("\r\n\t- ChaCha20-Poly1305 Decryption End");
     return tagMatch;
 }
 #endif
